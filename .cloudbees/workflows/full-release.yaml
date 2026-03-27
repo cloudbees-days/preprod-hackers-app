@@ -7,11 +7,9 @@ on:
       manifest:
         type: string
         required: true
-        description:
-          This is a system-generated parameter and is required for use in
-          application releases. Refer to
-          https://docs.cloudbees.com/docs/cloudbees-platform/latest/applications/releases#manifest
-          for the expected format
+        description: This is a system-generated parameter and is required for use in application releases. Refer to https://docs.cloudbees.com/docs/cloudbees-platform/latest/applications/releases#manifest for the expected format
+      FlagIDs:
+        type: string
 metadata:
   stages/v1alpha1:
     - name: Release Readiness
@@ -55,22 +53,17 @@ jobs:
           jira-token: ${{ secrets.JIRA_TOKEN }}
           project-key: UDEMO
           issue-type: Task
-          issue-fields: >
-            summary: "Release ${{ cloudbees.scm.repository}} #${{
-            cloudbees.run_number }}"
-
+          issue-fields: |
+            summary: "Release ${{ cloudbees.scm.repository}} #${{ cloudbees.run_number }}"
             description: |
               Initializing release of ${{ cloudbees.scm.repository}} #${{ cloudbees.run_number }}
       - name: Report release issue creation
         uses: cloudbees-io/publish-evidence-item@v1
         with:
-          content: >-
+          content: |-
             ## Release Issue Created
 
-
-            **Release Issue:** ${{ steps.create-release-issue.outputs.issue-key
-            }}
-
+            **Release Issue:** ${{ steps.create-release-issue.outputs.issue-key }}
             **URL:** ${{ steps.create-release-issue.outputs.issue-url }}
           format: MARKDOWN
   gather-evidence:
@@ -109,25 +102,16 @@ jobs:
       - name: Format issues as table
         uses: docker://alpine:3.19
         id: format-issues
-        run: >
+        run: |
           # Install jq for JSON parsing
-
           apk add --no-cache jq
 
-
           # Create markdown table from JSON
-
           echo 'issues-table<<EOF' >> $CLOUDBEES_OUTPUTS/issues-table
-
-          echo '| Key | Summary | Status | Priority |' >>
-          $CLOUDBEES_OUTPUTS/issues-table
-
-          echo '|-----|---------|--------|----------|' >>
-          $CLOUDBEES_OUTPUTS/issues-table
-
+          echo '| Key | Summary | Status | Priority |' >> $CLOUDBEES_OUTPUTS/issues-table
+          echo '|-----|---------|--------|----------|' >> $CLOUDBEES_OUTPUTS/issues-table
 
           # Parse JSON and format as table rows
-
           echo '${{ steps.get-issues.outputs.issues }}' | jq -r '.[] |
             "| " + .key + " | " + .fields.summary + " | " + .fields.status.name + " | " + .fields.priority.name + " |"' >> $CLOUDBEES_OUTPUTS/issues-table
 
@@ -247,45 +231,27 @@ jobs:
       - name: Publish Quality Gate Evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
-          content: >
+          content: |
             # Quality Gate Results
 
-
             ## Security Scan
-
             - **Critical**: 0
-
             - **High**: 2
-
             - **Medium**: 7
-
             - **Low**: 23
-
             - **Total Issues**: 77
 
-
             ## Code Quality
-
-            - **Quality Score**: ${{ steps.code-analysis.outputs.quality-score
-            }}/100
-
+            - **Quality Score**: ${{ steps.code-analysis.outputs.quality-score }}/100
             - **Test Coverage**: 87.3%
-
             - **Code Style Compliance**: 94%
-
             - **Maintainability**: Grade A
 
-
             ## Dependency Security
-
             - **Critical Vulnerabilities**: 0
-
             - **High Vulnerabilities**: 0
-
             - **Moderate Vulnerabilities**: 1
-
             - **Low Vulnerabilities**: 3
-
 
             **Quality Gate**: PASSED - No blocking issues found
           format: MARKDOWN
@@ -334,7 +300,7 @@ jobs:
         id: config-update
         with:
           token: ${{ secrets.UNIFY_TOKEN }}
-          org-id: "9e75cb41-ffa9-4d19-b6f7-7ef430e79b29"
+          org-id: 9e75cb41-ffa9-4d19-b6f7-7ef430e79b29
           application-name: preprod-hackers-app
           environment-name: preprod-hackers-qa
           flag-name: default.score
@@ -377,44 +343,27 @@ jobs:
       - name: Run Unit & Integration Tests
         id: test-execution
         uses: docker://node:22-alpine
-        run: >
+        run: |
           echo "Running comprehensive test suite..."
-
           sleep 5
 
-
           # Simulate test execution
-
           TOTAL_TESTS=247
-
           PASSED_TESTS=239
-
           FAILED_TESTS=8
-
           SKIPPED_TESTS=0
-
           COVERAGE=87
 
-
           echo "=== Test Results ==="
-
           echo "Total Tests: $TOTAL_TESTS"
-
           echo "Passed: $PASSED_TESTS ✓"
-
           echo "Failed: $FAILED_TESTS ✗"
-
           echo "Skipped: $SKIPPED_TESTS"
-
           echo "Success Rate: $(( PASSED_TESTS * 100 / TOTAL_TESTS ))%"
-
           echo "Coverage: ${COVERAGE}%"
 
-
           # Output results
-
           cat > test_results.json << EOF
-
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
             "total": $TOTAL_TESTS,
@@ -430,12 +379,9 @@ jobs:
               {"name": "Service Integration", "tests": 46, "passed": 46, "failed": 0}
             ]
           }
-
           EOF
 
-
           cat test_results.json > $CLOUDBEES_OUTPUTS/results
-
           echo "$COVERAGE" > $CLOUDBEES_OUTPUTS/coverage
       - name: Run Performance Tests
         id: performance-tests
@@ -507,34 +453,22 @@ jobs:
       - name: Evaluate Test Results
         id: evaluate-criteria
         uses: docker://alpine:3.20
-        run: >
+        run: |
           apk add --no-cache jq
 
-
           # Parse test results from previous job
-
-          echo '${{ needs.run-tests-qa.outputs.test-results }}' >
-          test_results.json
-
+          echo '${{ needs.run-tests-qa.outputs.test-results }}' > test_results.json
 
           TOTAL=$(jq -r '.total' test_results.json)
-
           PASSED=$(jq -r '.passed' test_results.json)
-
           SUCCESS_RATE=$(jq -r '.success_rate' test_results.json)
-
           COVERAGE=${{ needs.run-tests-qa.outputs.test-coverage }}
 
-
           echo "=== QA Exit Criteria Evaluation ==="
-
           echo "Test Success Rate: ${SUCCESS_RATE}% (Required: ≥75%)"
-
           echo "Code Coverage: ${COVERAGE}% (Required: ≥80%)"
 
-
           # Evaluate criteria
-
           if [ $SUCCESS_RATE -ge 75 ] && [ $COVERAGE -ge 80 ]; then
             echo "✅ All test criteria met"
             echo "PASSED" > $CLOUDBEES_OUTPUTS/status
@@ -570,32 +504,21 @@ jobs:
           fi
       - name: Performance Threshold Check
         uses: docker://alpine:3.20
-        run: >
+        run: |
           apk add --no-cache jq
 
-
-          echo '${{ needs.run-tests-qa.outputs.performance-metrics }}' >
-          performance.json
-
+          echo '${{ needs.run-tests-qa.outputs.performance-metrics }}' > performance.json
 
           RESPONSE_TIME=$(jq -r '.response_time_ms' performance.json)
-
           CPU_USAGE=$(jq -r '.cpu_usage_percent' performance.json)
-
           MEMORY_USAGE=$(jq -r '.memory_usage_percent' performance.json)
 
-
           echo "=== Performance Thresholds ==="
-
           echo "Response Time: ${RESPONSE_TIME}ms (Threshold: ≤500ms)"
-
           echo "CPU Usage: ${CPU_USAGE}% (Threshold: ≤80%)"
-
           echo "Memory Usage: ${MEMORY_USAGE}% (Threshold: ≤85%)"
 
-
-          if [ $RESPONSE_TIME -le 500 ] && [ $CPU_USAGE -le 80 ] && [
-          $MEMORY_USAGE -le 85 ]; then
+          if [ $RESPONSE_TIME -le 500 ] && [ $CPU_USAGE -le 80 ] && [ $MEMORY_USAGE -le 85 ]; then
             echo "✅ All performance thresholds met"
           else
             echo "⚠️ Performance thresholds exceeded"
@@ -603,39 +526,23 @@ jobs:
       - name: Publish Exit Criteria Evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
-          content: >
+          content: |
             # QA Exit Criteria Assessment
 
-
             ## Test Quality Gate
-
             - **Success Rate**: 96.8% (Required: ≥75%)
-
-            - **Code Coverage**: ${{ needs.run-tests-qa.outputs.test-coverage
-            }}% (Required: ≥80%)
-
+            - **Code Coverage**: ${{ needs.run-tests-qa.outputs.test-coverage }}% (Required: ≥80%)
             - **Gate Status**: ${{ steps.evaluate-criteria.outputs.status }}
 
-
             ## Issue Analysis
-
             - **P1 Critical Issues**: 0
-
-            - **P2 High Priority**: ${{
-            steps.check-issues.outputs.blocking-count }}
-
-            - **Blocking Issues**: ${{ steps.check-issues.outputs.blocking-count
-            }} total
-
+            - **P2 High Priority**: ${{ steps.check-issues.outputs.blocking-count }}
+            - **Blocking Issues**: ${{ steps.check-issues.outputs.blocking-count }} total
 
             ## Performance Validation
-
             - **Response Time**: <500ms
-
             - **Resource Usage**: Within limits
-
             - **Load Testing**: Passed
-
 
             **QA Exit Criteria**: PASSED - Ready for Release Manager approval
           format: MARKDOWN
@@ -668,7 +575,7 @@ jobs:
         id: config-update
         with:
           token: ${{ secrets.UNIFY_TOKEN }}
-          org-id: "9e75cb41-ffa9-4d19-b6f7-7ef430e79b29"
+          org-id: 9e75cb41-ffa9-4d19-b6f7-7ef430e79b29
           application-name: preprod-hackers-app
           environment-name: preprod-hackers-staging
           flag-name: default.score
@@ -703,38 +610,24 @@ jobs:
       - name: Run Staging Test Suite
         id: staging-tests
         uses: docker://node:18-alpine
-        run: >
+        run: |
           echo "Running comprehensive staging test suite..."
-
           sleep 6
 
-
           # Simulate more comprehensive staging tests
-
           TOTAL_TESTS=342
-
           PASSED_TESTS=340
-
           FAILED_TESTS=2
-
           COVERAGE=92
 
-
           echo "=== Staging Test Results ==="
-
           echo "Total Tests: $TOTAL_TESTS"
-
           echo "Passed: $PASSED_TESTS ✓"
-
           echo "Failed: $FAILED_TESTS ✗"
-
           echo "Success Rate: $(( PASSED_TESTS * 100 / TOTAL_TESTS ))%"
-
           echo "Coverage: ${COVERAGE}%"
 
-
           cat > staging_results.json << EOF
-
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
             "total": $TOTAL_TESTS,
@@ -750,55 +643,35 @@ jobs:
               {"name": "Feature Flag Tests", "tests": 47, "passed": 47, "failed": 0}
             ]
           }
-
           EOF
-
 
           cat staging_results.json > $CLOUDBEES_OUTPUTS/results
       - name: End-to-End Tests
         id: e2e-tests
         uses: docker://mcr.microsoft.com/playwright:v1.40.0-focal
-        run: >
+        run: |
           echo "Running end-to-end user journey tests..."
-
           sleep 8
 
-
           # Simulate E2E test scenarios
-
           SCENARIOS=24
-
           PASSED_SCENARIOS=23
-
           FAILED_SCENARIOS=1
 
-
           echo "=== E2E Test Scenarios ==="
-
           echo "Total Scenarios: $SCENARIOS"
-
           echo "Passed: $PASSED_SCENARIOS ✓"
-
           echo "Failed: $FAILED_SCENARIOS ✗"
-
           echo "Success Rate: $(( PASSED_SCENARIOS * 100 / SCENARIOS ))%"
 
-
           echo "✓ User Registration Flow"
-
           echo "✓ Authentication & Login"
-
           echo "✓ Core Application Features"
-
           echo "✓ Payment Processing"
-
           echo "✓ Data Export/Import"
-
           echo "⚠ Cross-browser Compatibility (1 failure)"
 
-
           cat > e2e_results.json << EOF
-
           {
             "scenarios": $SCENARIOS,
             "passed": $PASSED_SCENARIOS,
@@ -813,9 +686,7 @@ jobs:
               {"name": "Cross-browser", "status": "failed", "issue": "Safari compatibility"}
             ]
           }
-
           EOF
-
 
           cat e2e_results.json > $CLOUDBEES_OUTPUTS/results
       - name: Publish Staging Test Evidence
@@ -858,33 +729,21 @@ jobs:
       - name: Production Readiness Assessment
         id: readiness-check
         uses: docker://alpine:3.20
-        run: >
+        run: |
           apk add --no-cache jq
 
-
           # Parse staging test results
-
-          echo '${{ needs.run-tests-staging.outputs.test-results }}' >
-          staging_results.json
-
-          echo '${{ needs.run-tests-staging.outputs.e2e-results }}' >
-          e2e_results.json
-
+          echo '${{ needs.run-tests-staging.outputs.test-results }}' > staging_results.json
+          echo '${{ needs.run-tests-staging.outputs.e2e-results }}' > e2e_results.json
 
           STAGING_SUCCESS=$(jq -r '.success_rate' staging_results.json)
-
           E2E_SUCCESS=$(jq -r '.success_rate' e2e_results.json)
 
-
           echo "=== Production Readiness Criteria ==="
-
           echo "Staging Tests: ${STAGING_SUCCESS}% (Required: ≥99%)"
-
           echo "E2E Scenarios: ${E2E_SUCCESS}% (Required: ≥95%)"
 
-
           # Check readiness criteria
-
           if [ $STAGING_SUCCESS -ge 99 ] && [ $E2E_SUCCESS -ge 95 ]; then
             echo "✅ Production readiness criteria met"
             echo "READY" > $CLOUDBEES_OUTPUTS/status
@@ -952,51 +811,31 @@ jobs:
       - name: Publish Production Readiness Evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
-          content: >
+          content: |
             # Staging Exit Criteria & Production Readiness
 
-
             ## Test Validation
-
             - **Staging Success Rate**: 99.4% (Required: ≥99%)
-
             - **E2E Success Rate**: 95.8% (Required: ≥95%)
-
             - **Critical Path Coverage**: 100%
-
             - **Performance Thresholds**: Met
 
-
             ## Risk Assessment
-
             - **Overall Risk Level**: ${{ steps.risk-analysis.outputs.level }}
-
             - **Deployment Risk**: LOW
-
             - **Rollback Plan**: READY
-
             - **Business Impact**: Validated
 
-
             ## Infrastructure Readiness
-
             - **Production Capacity**: 73% available
-
             - **Monitoring**: Active
-
             - **Auto-scaling**: Configured
-
             - **Backup Systems**: Verified
 
-
             ## Business Validation
-
             - **Stakeholder Approval**: Complete
-
             - **Documentation**: Updated
-
             - **Support Team**: Notified
-
 
             **Production Readiness**: ${{ steps.readiness-check.outputs.status }}
           format: MARKDOWN
@@ -1032,35 +871,24 @@ jobs:
       - name: Production Health Check
         id: health-check
         uses: docker://alpine:3.19
-        run: >
+        run: |
           apk add --no-cache curl jq
 
-
           echo "Checking production service health..."
-
           sleep 3
 
                     # Simulate health endpoint checks
           WEB_HEALTH="UP"
-
           AUTH_HEALTH="UP"
-
           API_HEALTH="UP"
 
-
           echo "=== Service Health Status ==="
-
           echo "Web Service: $WEB_HEALTH"
-
           echo "Auth Service: $AUTH_HEALTH"
-
           echo "API Service: $API_HEALTH"
 
-
           # Overall health
-
-          if [ "$WEB_HEALTH" = "UP" ] && [ "$AUTH_HEALTH" = "UP" ] && [
-          "$API_HEALTH" = "UP" ]; then
+          if [ "$WEB_HEALTH" = "UP" ] && [ "$AUTH_HEALTH" = "UP" ] && [ "$API_HEALTH" = "UP" ]; then
             echo "HEALTHY" > $CLOUDBEES_OUTPUTS/status
             echo "All systems operational"
           else
@@ -1200,20 +1028,16 @@ jobs:
       - name: Get current time
         id: current-time
         uses: docker://alpine:3.20
-        run: >
+        run: |
           echo "$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")" > $CLOUDBEES_OUTPUTS/now
-
-          echo "$(date -u -d "@$(( $(date +%s) + 3600 ))"
-          +%Y-%m-%dT%H:%M:%S.000Z)" > $CLOUDBEES_OUTPUTS/one-hour
-
-          echo "$(date -u -d "@$(( $(date +%s) + 7200 ))"
-          +%Y-%m-%dT%H:%M:%S.000Z)" > $CLOUDBEES_OUTPUTS/two-hours
+          echo "$(date -u -d "@$(( $(date +%s) + 3600 ))" +%Y-%m-%dT%H:%M:%S.000Z)" > $CLOUDBEES_OUTPUTS/one-hour
+          echo "$(date -u -d "@$(( $(date +%s) + 7200 ))" +%Y-%m-%dT%H:%M:%S.000Z)" > $CLOUDBEES_OUTPUTS/two-hours
       - name: Roll out flags on schedule
         uses: https://github.com/cloudbees-days/fm-update-flag
         id: config-update
         with:
           token: ${{ secrets.UNIFY_TOKEN }}
-          org-id: "9e75cb41-ffa9-4d19-b6f7-7ef430e79b29"
+          org-id: 9e75cb41-ffa9-4d19-b6f7-7ef430e79b29
           application-name: preprod-hackers-app
           environment-name: preprod-hackers-prod
           flag-name: default.score
